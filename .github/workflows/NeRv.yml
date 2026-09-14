@@ -1,21 +1,14 @@
-name: Start NeRv
-
+name: build Stable
 on:
   workflow_dispatch:
 
 jobs:
-  Reforging:
+  build:
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        build_type:
-          - KSU          
 
     steps:
     - name: 🔄 Checkout Code
-      uses: actions/checkout@v5
+      uses: actions/checkout@v4
 
     - name: ⏰ Prepare timezone
       run: |
@@ -26,15 +19,16 @@ jobs:
       run: |
         sudo apt update -y
         sudo apt install bc cpio flex bison aptitude git python-is-python3 tar aria2 perl wget curl lz4 libssl-dev -y
-        
+
+    - name: ⚙️ Setup Environment
+      run: |
+        echo "BUILD_TIME=$(TZ=Asia/Jakarta date '+%d%m%Y-%H%M')" >> $GITHUB_ENV
+
     - name: 📅 Set BUILD DATE
       run: |
         echo "BUILD_DATE='\"$(TZ=Asia/Jakarta date '+%b %d %Y')\"'" >> $GITHUB_ENV
-
-    - name: 📥 Setup KernelSU-Next
-      if: ${{ matrix.build_type == 'KSU' || matrix.build_type == 'KSU-OEM' }}
-      run: |
         curl -LSs "https://raw.githubusercontent.com/manipvlator/KernelSU-Next/stable/kernel/setup.sh" | bash -s syscall
-        bash copyright
 
-    
+    - name: 🛠️ Build Kernel
+      run: |
+        bash copyright
