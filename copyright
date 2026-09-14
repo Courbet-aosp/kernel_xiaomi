@@ -36,18 +36,14 @@ ANYKERNEL_REPO="https://github.com/ZGSYet/AnyKernel3"
 ANYKERNEL_BRANCH="master"
 
 # ── Toolchain Config ─────────────────────────────────────────────
-# Clang akan di-install langsung ke:
-# ~/kernel/clang
+# Toolchains di-setup di workflow (Clone Toolchains step):
+#   clang  -> $KERNEL_DIR/clang
+#   gcc64  -> $KERNEL_DIR/gcc64
+#   gcc32  -> $KERNEL_DIR/gcc32
 
-TOOLCHAIN_DIR="$KERNEL_DIR/clang"
-CLANG_DIR="$TOOLCHAIN_DIR"
-
-CLANG_URL="https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/06092026/neutron-clang-06092026.tar.zst"
-
+CLANG_DIR="$KERNEL_DIR/clang"
 GCC64_DIR="$KERNEL_DIR/gcc64"
-
-GCC64_REPO="https://github.com/greenforce-project/gcc-arm64"
-GCC_BRANCH="main"
+GCC32_DIR="$KERNEL_DIR/gcc32"
 
 # ── Output Paths ─────────────────────────────────────────────────
 OUT="$KERNEL_DIR/out"
@@ -64,7 +60,7 @@ export ARCH=arm64
 export KBUILD_BUILD_USER="Aciss"
 export KBUILD_BUILD_HOST="TUF-FA5093"
 
-export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$PATH"
+export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
 
 SECONDS=0
 
@@ -127,121 +123,27 @@ tg_send_log() {
         > /dev/null
 }
 
-# ── Toolchain Setup ──────────────────────────────────────────────
+# ── Toolchain Check ──────────────────────────────────────────────
 
-setup_clang() {
-
-    if [ -x "$CLANG_DIR/bin/clang" ]; then
-
-        echo "[0/4] Clang already installed."
-        echo "      Path: $CLANG_DIR"
-
-        return 0
-    fi
-
-    echo "[0/4] Installing Clang..."
-    echo "      Path: $CLANG_DIR"
-
-    tg_update "Kernel Build
-
-Device : $DEVICE
-Kernel : $KNAME
-
-[0/4] Installing Clang
-Path   : $CLANG_DIR
-
-Status : Downloading"
-
-    mkdir -p "$CLANG_DIR"
-
-    wget -q --show-progress \
-        "$CLANG_URL" \
-        -O "$CLANG_DIR/clang.tar.zst"
-
-    if [ ! -s "$CLANG_DIR/clang.tar.zst" ]; then
-
-        echo "Download Clang failed."
-
-        tg_update "Kernel Build Failed
-
-Device : $DEVICE
-Kernel : $KNAME
-
-Error  : Clang download failed"
-
-        exit 1
-    fi
-
-    echo
-    echo "Extracting Clang..."
-
-    if ! command -v zstd >/dev/null 2>&1; then
-        echo "zstd not found, installing..."
-        sudo apt-get update -y >/dev/null 2>&1 || true
-        sudo apt-get install -y zstd >/dev/null 2>&1 || {
-            echo "Cannot install zstd. Install it manually (apt install zstd)."
-            exit 1
-        }
-    fi
-
-    tar -xf "$CLANG_DIR/clang.tar.zst" \
-        -C "$CLANG_DIR"
-
-    if [ $? -ne 0 ]; then
-
-        echo "Failed to extract Clang."
-
-        rm -f "$CLANG_DIR/clang.tar.zst"
-
-        tg_update "Kernel Build Failed
-
-Device : $DEVICE
-Kernel : $KNAME
-
-Error  : Clang extraction failed"
-
-        exit 1
-    fi
-
-    rm -f "$CLANG_DIR/clang.tar.zst"
-
+check_toolchain() {
     if [ ! -x "$CLANG_DIR/bin/clang" ]; then
-
-        echo "Clang binary not found."
-
-        tg_update "Kernel Build Failed
-
-Device : $DEVICE
-Kernel : $KNAME
-
-Error  : clang binary not found"
-
+        echo "clang not found at: $CLANG_DIR"
+        echo "Setup toolchains dulu (Step 'Clone Toolchains' di workflow)."
         exit 1
     fi
 
-    echo
-    echo "Clang installed."
-    echo "Path: $CLANG_DIR"
-
-    "$CLANG_DIR/bin/clang" --version | head -1
-
-    echo
+    if [ ! -x "$GCC64_DIR/bin/aarch64-elf-gcc" ]; then
+        echo "gcc64 not found at: $GCC64_DIR"
+        echo "Setup toolchains dulu (Step 'Clone Toolchains' di workflow)."
+        exit 1
+    fi
 }
 
-setup_gcc() {
-    if [ -x "$GCC64_DIR/bin/aarch64-elf-gcc" ]; then
-        echo "[0/4] GCC64 already present."
-    else
-        echo "[0/4] Cloning GCC64 (aarch64-elf)..."
-        git clone --depth=1 -b "$GCC_BRANCH" "$GCC64_REPO" "$GCC64_DIR"
-        if [ $? -ne 0 ] || [ ! -x "$GCC64_DIR/bin/aarch64-elf-gcc" ]; then
-            echo "Failed to clone GCC64."
-            exit 1
-        fi
-    fi
-
+link_gcc64() {
+    # Tree 4.14 ini nurunkan --target clang dari CROSS_COMPILE (bukan
+    # CLANG_TRIPLE), jadi butuh alias aarch64-linux-gnu-* di gcc64/bin.
     if [ ! -e "$GCC64_DIR/bin/aarch64-linux-gnu-gcc" ]; then
-        echo "[0/4] Linking GCC64 as aarch64-linux-gnu..."
+        echo "Linking GCC64 as aarch64-linux-gnu..."
         for f in "$GCC64_DIR"/bin/aarch64-elf-*; do
             n=$(basename "$f")
             [ -e "$GCC64_DIR/bin/${n/aarch64-elf-/aarch64-linux-gnu-}" ] && continue
@@ -260,7 +162,7 @@ echo " Kernel  : $KNAME"
 echo " Variant : $VAR"
 echo " Builder : $KBUILD_BUILD_USER@$KBUILD_BUILD_HOST"
 echo " Clang   : $CLANG_DIR"
-echo " GCC     : $GCC64_DIR"
+echo " GCC     : $GCC64_DIR / $GCC32_DIR"
 echo " Output  : $ZIPNAME"
 echo "================================================"
 
@@ -278,10 +180,10 @@ Start   : $TIME_START
 
 Status  : Starting"
 
-# ── Step 0: Toolchain ────────────────────────────────────────────
+# ── Step 0: Toolchain Check ──────────────────────────────────────
 
-setup_clang
-setup_gcc
+check_toolchain
+link_gcc64
 
 # Pastikan selalu kembali ke root kernel
 cd "$KERNEL_DIR" || exit 1
@@ -333,8 +235,8 @@ make O="$OUT" \
     LLVM=1 \
     LLVM_IAS=1 \
     CC=clang \
-    CLANG_TRIPLE="$CLANG_DIR/aarch64-linux-gnu-" \
     CROSS_COMPILE="$GCC64_DIR/bin/aarch64-linux-gnu-" \
+    CROSS_COMPILE_ARM32="$GCC32_DIR/bin/arm-eabi-" \
     vendor/courbet_defconfig
 
 DEFCONFIG_STATUS=$?
@@ -386,8 +288,8 @@ make -j"$THREADS" \
     LLVM=1 \
     LLVM_IAS=1 \
     CC=clang \
-    CLANG_TRIPLE="$CLANG_DIR/aarch64-linux-gnu-" \
     CROSS_COMPILE="$GCC64_DIR/bin/aarch64-linux-gnu-" \
+    CROSS_COMPILE_ARM32="$GCC32_DIR/bin/arm-eabi-" \
     2>&1 | tee "$BUILD_LOG"
 
 BUILD_STATUS=${PIPESTATUS[0]}
