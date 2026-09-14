@@ -1,0 +1,40 @@
+name: Start NeRv
+
+on:
+  workflow_dispatch:
+
+jobs:
+  Reforging:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type:
+          - KSU          
+
+    steps:
+    - name: 🔄 Checkout Code
+      uses: actions/checkout@v5
+
+    - name: ⏰ Prepare timezone
+      run: |
+        sudo rm /etc/localtime
+        sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+
+    - name: 📦 Install Dependencies
+      run: |
+        sudo apt update -y
+        sudo apt install bc cpio flex bison aptitude git python-is-python3 tar aria2 perl wget curl lz4 libssl-dev -y
+        
+    - name: 📅 Set BUILD DATE
+      run: |
+        echo "BUILD_DATE='\"$(TZ=Asia/Jakarta date '+%b %d %Y')\"'" >> $GITHUB_ENV
+
+    - name: 📥 Setup KernelSU-Next
+      if: ${{ matrix.build_type == 'KSU' || matrix.build_type == 'KSU-OEM' }}
+      run: |
+        curl -LSs "https://raw.githubusercontent.com/manipvlator/KernelSU-Next/stable/kernel/setup.sh" | bash -s syscall
+        bash copyright
+
+    
