@@ -28,7 +28,7 @@ fi
 # ── Build Config ─────────────────────────────────────────────────
 DEVICE="courbet"
 KNAME="一マShuSi"
-VAR="Oem"
+VAR="Aosp"
 
 ZIPNAME="${KNAME}-${VAR}.zip"
 
