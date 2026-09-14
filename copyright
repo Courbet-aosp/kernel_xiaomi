@@ -45,10 +45,8 @@ CLANG_DIR="$TOOLCHAIN_DIR"
 CLANG_URL="https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/06092026/neutron-clang-06092026.tar.zst"
 
 GCC64_DIR="$KERNEL_DIR/gcc64"
-GCC32_DIR="$KERNEL_DIR/gcc32"
 
 GCC64_REPO="https://github.com/greenforce-project/gcc-arm64"
-GCC32_REPO="https://github.com/greenforce-project/gcc-arm"
 GCC_BRANCH="main"
 
 # ── Output Paths ─────────────────────────────────────────────────
@@ -66,7 +64,7 @@ export ARCH=arm64
 export KBUILD_BUILD_USER="Aciss"
 export KBUILD_BUILD_HOST="TUF-FA5093"
 
-export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$GCC32_DIR/bin:$PATH"
+export PATH="$CLANG_DIR/bin:$GCC64_DIR/bin:$PATH"
 
 SECONDS=0
 
@@ -250,17 +248,6 @@ setup_gcc() {
             ln -s "$n" "$GCC64_DIR/bin/${n/aarch64-elf-/aarch64-linux-gnu-}"
         done
     fi
-
-    if [ -x "$GCC32_DIR/bin/arm-eabi-gcc" ]; then
-        echo "[0/4] GCC32 already present."
-    else
-        echo "[0/4] Cloning GCC32 (arm-eabi)..."
-        git clone --depth=1 -b "$GCC_BRANCH" "$GCC32_REPO" "$GCC32_DIR"
-        if [ $? -ne 0 ] || [ ! -x "$GCC32_DIR/bin/arm-eabi-gcc" ]; then
-            echo "Failed to clone GCC32."
-            exit 1
-        fi
-    fi
 }
 
 # ── Header ───────────────────────────────────────────────────────
@@ -273,7 +260,7 @@ echo " Kernel  : $KNAME"
 echo " Variant : $VAR"
 echo " Builder : $KBUILD_BUILD_USER@$KBUILD_BUILD_HOST"
 echo " Clang   : $CLANG_DIR"
-echo " GCC     : $GCC64_DIR / $GCC32_DIR"
+echo " GCC     : $GCC64_DIR"
 echo " Output  : $ZIPNAME"
 echo "================================================"
 
@@ -348,7 +335,6 @@ make O="$OUT" \
     CC=clang \
     CLANG_TRIPLE="$CLANG_DIR/aarch64-linux-gnu-" \
     CROSS_COMPILE="$GCC64_DIR/bin/aarch64-linux-gnu-" \
-    CROSS_COMPILE_ARM32="$GCC32_DIR/bin/arm-eabi-" \
     vendor/courbet_defconfig
 
 DEFCONFIG_STATUS=$?
@@ -402,7 +388,6 @@ make -j"$THREADS" \
     CC=clang \
     CLANG_TRIPLE="$CLANG_DIR/aarch64-linux-gnu-" \
     CROSS_COMPILE="$GCC64_DIR/bin/aarch64-linux-gnu-" \
-    CROSS_COMPILE_ARM32="$GCC32_DIR/bin/arm-eabi-" \
     2>&1 | tee "$BUILD_LOG"
 
 BUILD_STATUS=${PIPESTATUS[0]}
